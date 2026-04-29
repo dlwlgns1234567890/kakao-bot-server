@@ -1,0 +1,565 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>봇 관리자 대시보드</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Noto+Sans+KR:wght@300;400;700&display=swap');
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --bg: #0a0a0f;
+  --surface: #111118;
+  --surface2: #16161f;
+  --border: #1e1e2e;
+  --accent: #7c6af7;
+  --accent2: #5eead4;
+  --text: #e2e2f0;
+  --muted: #55556a;
+  --danger: #f87171;
+  --warn: #fbbf24;
+  --success: #34d399;
+  --mono: 'JetBrains Mono', monospace;
+  --sans: 'Noto Sans KR', sans-serif;
+}
+body { background: var(--bg); color: var(--text); font-family: var(--sans); min-height: 100vh; display: flex; }
+
+/* ── 사이드바 ── */
+.sidebar {
+  width: 220px; min-height: 100vh;
+  background: var(--surface);
+  border-right: 1px solid var(--border);
+  display: flex; flex-direction: column;
+  padding: 24px 0; position: fixed; top: 0; left: 0; bottom: 0;
+  z-index: 100;
+}
+.sidebar-logo {
+  padding: 0 20px 24px;
+  border-bottom: 1px solid var(--border);
+}
+.sidebar-logo .tag {
+  font-family: var(--mono); font-size: 10px;
+  color: var(--accent2); letter-spacing: 2px;
+  text-transform: uppercase; margin-bottom: 4px;
+}
+.sidebar-logo h2 { font-size: 18px; font-weight: 700; }
+.nav { flex: 1; padding: 16px 12px; display: flex; flex-direction: column; gap: 4px; }
+.nav-item {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 12px; border-radius: 8px; cursor: pointer;
+  font-size: 14px; color: var(--muted); transition: all .15s;
+  border: none; background: none; width: 100%; text-align: left;
+}
+.nav-item:hover { background: var(--surface2); color: var(--text); }
+.nav-item.active { background: rgba(124,106,247,.15); color: var(--accent); }
+.nav-item .icon { font-size: 16px; width: 20px; text-align: center; }
+.sidebar-footer { padding: 16px 20px; border-top: 1px solid var(--border); }
+.logout-btn {
+  font-size: 13px; color: var(--muted); background: none; border: none;
+  cursor: pointer; font-family: var(--sans); padding: 0;
+}
+.logout-btn:hover { color: var(--danger); }
+
+/* ── 메인 ── */
+.main { margin-left: 220px; flex: 1; padding: 32px; min-height: 100vh; }
+.page { display: none; }
+.page.active { display: block; }
+h1 { font-size: 24px; font-weight: 700; margin-bottom: 24px; }
+
+/* ── 카드 ── */
+.card {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 12px; padding: 24px;
+}
+
+/* ── 통계 카드 ── */
+.stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px,1fr)); gap: 16px; margin-bottom: 28px; }
+.stat-card {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 12px; padding: 20px 24px;
+}
+.stat-label { font-family: var(--mono); font-size: 10px; color: var(--muted); letter-spacing: 1.5px; text-transform: uppercase; margin-bottom: 8px; }
+.stat-value { font-size: 32px; font-weight: 700; font-family: var(--mono); }
+.stat-value.accent { color: var(--accent); }
+.stat-value.danger { color: var(--danger); }
+.stat-value.success { color: var(--success); }
+.stat-value.warn { color: var(--warn); }
+
+/* ── 필터 바 ── */
+.filter-bar { display: flex; gap: 12px; margin-bottom: 20px; flex-wrap: wrap; }
+.filter-bar input, .filter-bar select {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 8px; padding: 10px 14px; color: var(--text);
+  font-family: var(--sans); font-size: 14px; outline: none;
+  transition: border-color .15s;
+}
+.filter-bar input:focus, .filter-bar select:focus { border-color: var(--accent); }
+.filter-bar input { flex: 1; min-width: 200px; }
+
+/* ── 테이블 ── */
+.table-wrap { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; font-size: 14px; }
+th {
+  text-align: left; padding: 12px 16px;
+  font-family: var(--mono); font-size: 10px; letter-spacing: 1.5px;
+  text-transform: uppercase; color: var(--muted);
+  border-bottom: 1px solid var(--border);
+}
+td { padding: 13px 16px; border-bottom: 1px solid rgba(30,30,46,.6); vertical-align: middle; }
+tr:hover td { background: rgba(124,106,247,.04); }
+.badge {
+  display: inline-block; padding: 3px 10px; border-radius: 20px;
+  font-family: var(--mono); font-size: 11px; font-weight: 700;
+}
+.badge.banned { background: rgba(248,113,113,.15); color: var(--danger); border: 1px solid rgba(248,113,113,.3); }
+.badge.ok { background: rgba(52,211,153,.12); color: var(--success); border: 1px solid rgba(52,211,153,.25); }
+.badge.warn { background: rgba(251,191,36,.12); color: var(--warn); border: 1px solid rgba(251,191,36,.25); }
+
+/* ── 버튼 ── */
+.btn {
+  padding: 7px 14px; border-radius: 7px; font-size: 13px;
+  cursor: pointer; border: 1px solid transparent;
+  font-family: var(--sans); font-weight: 700; transition: all .15s;
+}
+.btn-danger { background: rgba(248,113,113,.15); color: var(--danger); border-color: rgba(248,113,113,.3); }
+.btn-danger:hover { background: rgba(248,113,113,.25); }
+.btn-success { background: rgba(52,211,153,.12); color: var(--success); border-color: rgba(52,211,153,.25); }
+.btn-success:hover { background: rgba(52,211,153,.22); }
+.btn-warn { background: rgba(251,191,36,.12); color: var(--warn); border-color: rgba(251,191,36,.25); }
+.btn-warn:hover { background: rgba(251,191,36,.22); }
+.btn-accent { background: rgba(124,106,247,.15); color: var(--accent); border-color: rgba(124,106,247,.3); }
+.btn-accent:hover { background: rgba(124,106,247,.25); }
+.btn-row { display: flex; gap: 6px; flex-wrap: wrap; }
+
+/* ── 페이지네이션 ── */
+.pagination { display: flex; gap: 8px; margin-top: 20px; justify-content: center; }
+.pagination button {
+  background: var(--surface); border: 1px solid var(--border);
+  color: var(--text); border-radius: 7px; padding: 7px 13px;
+  cursor: pointer; font-family: var(--mono); font-size: 13px;
+  transition: all .15s;
+}
+.pagination button:hover, .pagination button.active { border-color: var(--accent); color: var(--accent); background: rgba(124,106,247,.1); }
+.pagination button:disabled { opacity: .3; cursor: default; }
+
+/* ── 모달 ── */
+.modal-overlay {
+  position: fixed; inset: 0; background: rgba(0,0,0,.7);
+  display: flex; align-items: center; justify-content: center;
+  z-index: 200; display: none;
+}
+.modal-overlay.open { display: flex; }
+.modal {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 16px; padding: 32px; width: 520px; max-height: 80vh;
+  overflow-y: auto; position: relative;
+}
+.modal h2 { font-size: 20px; margin-bottom: 20px; }
+.modal-close {
+  position: absolute; top: 16px; right: 16px;
+  background: none; border: none; color: var(--muted);
+  font-size: 22px; cursor: pointer; line-height: 1;
+}
+.modal-close:hover { color: var(--text); }
+.field { margin-bottom: 16px; }
+.field label { display: block; font-size: 11px; font-family: var(--mono); color: var(--muted); letter-spacing: 1px; text-transform: uppercase; margin-bottom: 6px; }
+.field input, .field textarea {
+  width: 100%; background: var(--bg); border: 1px solid var(--border);
+  border-radius: 8px; padding: 11px 14px; color: var(--text);
+  font-family: var(--sans); font-size: 14px; outline: none; transition: border-color .15s;
+}
+.field input:focus, .field textarea:focus { border-color: var(--accent); }
+.field textarea { resize: vertical; min-height: 70px; }
+.modal-footer { display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px; }
+
+/* ── 채팅 로그 ── */
+.msg-log { font-family: var(--mono); font-size: 13px; }
+.msg-row { padding: 10px 0; border-bottom: 1px solid var(--border); display: grid; grid-template-columns: 130px 130px 1fr; gap: 12px; }
+.msg-time { color: var(--muted); font-size: 11px; }
+.msg-sender { color: var(--accent2); }
+.msg-content { color: var(--text); word-break: break-all; }
+
+/* ── 유저 상세 ── */
+.detail-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 20px; }
+.detail-item { }
+.detail-item .key { font-family: var(--mono); font-size: 10px; color: var(--muted); letter-spacing: 1px; text-transform: uppercase; margin-bottom: 4px; }
+.detail-item .val { font-size: 15px; }
+.log-list { list-style: none; }
+.log-list li {
+  padding: 10px 0; border-bottom: 1px solid var(--border);
+  font-size: 13px; display: flex; gap: 12px;
+}
+.log-list li:last-child { border: none; }
+.log-date { font-family: var(--mono); font-size: 11px; color: var(--muted); min-width: 130px; }
+
+/* ── 반응형 ── */
+@media (max-width: 768px) {
+  .sidebar { width: 60px; }
+  .sidebar-logo, .nav-item span, .sidebar-footer { display: none; }
+  .main { margin-left: 60px; padding: 20px; }
+  .detail-grid { grid-template-columns: 1fr; }
+}
+</style>
+</head>
+<body>
+
+<!-- 사이드바 -->
+<aside class="sidebar">
+  <div class="sidebar-logo">
+    <div class="tag">KakaoBot</div>
+    <h2>관리자 패널</h2>
+  </div>
+  <nav class="nav">
+    <button class="nav-item active" onclick="goto('dashboard')">
+      <span class="icon">📊</span><span>대시보드</span>
+    </button>
+    <button class="nav-item" onclick="goto('users')">
+      <span class="icon">👥</span><span>유저 목록</span>
+    </button>
+    <button class="nav-item" onclick="goto('banned')">
+      <span class="icon">🔨</span><span>밴 목록</span>
+    </button>
+    <button class="nav-item" onclick="goto('logs')">
+      <span class="icon">💬</span><span>채팅 로그</span>
+    </button>
+  </nav>
+  <div class="sidebar-footer">
+    <button class="logout-btn" onclick="location='/logout'">로그아웃</button>
+  </div>
+</aside>
+
+<!-- 메인 -->
+<main class="main">
+
+  <!-- 대시보드 -->
+  <div class="page active" id="page-dashboard">
+    <h1>대시보드</h1>
+    <div class="stats-grid" id="stats-grid">
+      <div class="stat-card"><div class="stat-label">전체 유저</div><div class="stat-value accent" id="s-total">—</div></div>
+      <div class="stat-card"><div class="stat-label">밴 유저</div><div class="stat-value danger" id="s-banned">—</div></div>
+      <div class="stat-card"><div class="stat-label">전체 메시지</div><div class="stat-value success" id="s-msgs">—</div></div>
+      <div class="stat-card"><div class="stat-label">오늘 메시지</div><div class="stat-value warn" id="s-today">—</div></div>
+      <div class="stat-card"><div class="stat-label">총 경고</div><div class="stat-value" id="s-warns">—</div></div>
+    </div>
+    <div class="card">
+      <p style="color:var(--muted);font-size:14px;line-height:1.8">
+        ✅ 서버가 정상 작동 중입니다.<br>
+        메신저봇R의 API KEY를 서버 URL과 함께 설정하면 봇이 연동됩니다.<br>
+        유저 관리는 <strong>유저 목록</strong>, 밴 현황은 <strong>밴 목록</strong> 탭에서 확인하세요.
+      </p>
+    </div>
+  </div>
+
+  <!-- 유저 목록 -->
+  <div class="page" id="page-users">
+    <h1>유저 목록</h1>
+    <div class="filter-bar">
+      <input type="text" id="user-search" placeholder="닉네임 검색..." oninput="loadUsers()">
+      <select id="user-filter" onchange="loadUsers()">
+        <option value="">전체</option>
+        <option value="false">정상</option>
+        <option value="true">밴됨</option>
+      </select>
+    </div>
+    <div class="card">
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>닉네임</th><th>첫 방문</th><th>마지막</th><th>메시지</th><th>경고</th><th>상태</th><th>액션</th>
+            </tr>
+          </thead>
+          <tbody id="users-tbody"></tbody>
+        </table>
+      </div>
+      <div class="pagination" id="users-pagination"></div>
+    </div>
+  </div>
+
+  <!-- 밴 목록 -->
+  <div class="page" id="page-banned">
+    <h1>밴 목록</h1>
+    <div class="card">
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>닉네임</th><th>사유</th><th>처리자</th><th>날짜</th><th>액션</th></tr>
+          </thead>
+          <tbody id="banned-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- 채팅 로그 -->
+  <div class="page" id="page-logs">
+    <h1>채팅 로그</h1>
+    <div class="card">
+      <div class="msg-log" id="msg-log-list"></div>
+    </div>
+  </div>
+
+</main>
+
+<!-- 유저 상세 모달 -->
+<div class="modal-overlay" id="modal-user">
+  <div class="modal">
+    <button class="modal-close" onclick="closeModal('modal-user')">✕</button>
+    <h2 id="modal-user-title">유저 정보</h2>
+    <div class="detail-grid" id="modal-user-detail"></div>
+    <div style="margin-bottom:12px">
+      <div class="field"><label>관리자 메모</label><textarea id="modal-note" rows="2"></textarea></div>
+      <button class="btn btn-accent" onclick="saveNote()">메모 저장</button>
+    </div>
+    <div class="btn-row" id="modal-user-actions"></div>
+    <div style="margin-top:20px">
+      <p style="font-family:var(--mono);font-size:10px;color:var(--muted);letter-spacing:1px;text-transform:uppercase;margin-bottom:10px">경고 기록</p>
+      <ul class="log-list" id="modal-warns"></ul>
+    </div>
+    <div style="margin-top:16px">
+      <p style="font-family:var(--mono);font-size:10px;color:var(--muted);letter-spacing:1px;text-transform:uppercase;margin-bottom:10px">밴 기록</p>
+      <ul class="log-list" id="modal-bans"></ul>
+    </div>
+    <div style="margin-top:16px">
+      <p style="font-family:var(--mono);font-size:10px;color:var(--muted);letter-spacing:1px;text-transform:uppercase;margin-bottom:10px">최근 채팅 (20개)</p>
+      <div class="msg-log" id="modal-msgs"></div>
+    </div>
+  </div>
+</div>
+
+<!-- 밴 모달 -->
+<div class="modal-overlay" id="modal-ban">
+  <div class="modal" style="width:400px">
+    <button class="modal-close" onclick="closeModal('modal-ban')">✕</button>
+    <h2>밴 처리</h2>
+    <input type="hidden" id="ban-target">
+    <div class="field"><label>닉네임</label><input type="text" id="ban-nickname" readonly></div>
+    <div class="field"><label>사유</label><input type="text" id="ban-reason" placeholder="예: 광고, 욕설..."></div>
+    <div class="modal-footer">
+      <button class="btn btn-danger" onclick="doAction('ban')">밴 처리</button>
+      <button class="btn" onclick="closeModal('modal-ban')" style="background:var(--surface2);color:var(--muted);border-color:var(--border)">취소</button>
+    </div>
+  </div>
+</div>
+
+<!-- 경고 모달 -->
+<div class="modal-overlay" id="modal-warn">
+  <div class="modal" style="width:400px">
+    <button class="modal-close" onclick="closeModal('modal-warn')">✕</button>
+    <h2>경고 처리</h2>
+    <input type="hidden" id="warn-target">
+    <div class="field"><label>닉네임</label><input type="text" id="warn-nickname" readonly></div>
+    <div class="field"><label>사유</label><input type="text" id="warn-reason" placeholder="경고 사유..."></div>
+    <div class="modal-footer">
+      <button class="btn btn-warn" onclick="doAction('warn')">경고 처리</button>
+      <button class="btn" onclick="closeModal('modal-warn')" style="background:var(--surface2);color:var(--muted);border-color:var(--border)">취소</button>
+    </div>
+  </div>
+</div>
+
+<script>
+let currentPage = 1;
+let currentUser = null;
+
+// ── 네비게이션 ──────────────────────────────
+function goto(page) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  document.getElementById('page-' + page).classList.add('active');
+  event.currentTarget.classList.add('active');
+  if (page === 'dashboard') loadStats();
+  if (page === 'users') loadUsers();
+  if (page === 'banned') loadBanned();
+  if (page === 'logs') loadLogs();
+}
+
+// ── 통계 ──────────────────────────────
+async function loadStats() {
+  const d = await fetch('/web/stats').then(r => r.json());
+  document.getElementById('s-total').textContent = d.totalUsers;
+  document.getElementById('s-banned').textContent = d.bannedUsers;
+  document.getElementById('s-msgs').textContent = d.totalMsgs;
+  document.getElementById('s-today').textContent = d.todayMsgs;
+  document.getElementById('s-warns').textContent = d.totalWarns;
+}
+
+// ── 유저 목록 ──────────────────────────────
+async function loadUsers(page = 1) {
+  currentPage = page;
+  const search = document.getElementById('user-search').value;
+  const banned = document.getElementById('user-filter').value;
+  const params = new URLSearchParams({ search, banned, page });
+  const d = await fetch('/web/users?' + params).then(r => r.json());
+
+  const tbody = document.getElementById('users-tbody');
+  tbody.innerHTML = d.rows.map(u => `
+    <tr>
+      <td><strong>${esc(u.nickname)}</strong></td>
+      <td style="color:var(--muted);font-size:12px;font-family:var(--mono)">${u.first_seen?.slice(0,10) || '-'}</td>
+      <td style="color:var(--muted);font-size:12px;font-family:var(--mono)">${u.last_seen?.slice(0,16) || '-'}</td>
+      <td style="font-family:var(--mono)">${u.msg_count}</td>
+      <td>${u.warn_count > 0 ? `<span class="badge warn">${u.warn_count}회</span>` : `<span style="color:var(--muted)">0</span>`}</td>
+      <td>${u.is_banned ? '<span class="badge banned">밴됨</span>' : '<span class="badge ok">정상</span>'}</td>
+      <td>
+        <div class="btn-row">
+          <button class="btn btn-accent" onclick="openUserDetail('${esc(u.nickname)}')">상세</button>
+          ${u.is_banned
+            ? `<button class="btn btn-success" onclick="quickUnban('${esc(u.nickname)}')">언밴</button>`
+            : `<button class="btn btn-danger" onclick="openBanModal('${esc(u.nickname)}')">밴</button>
+               <button class="btn btn-warn" onclick="openWarnModal('${esc(u.nickname)}')">경고</button>`}
+        </div>
+      </td>
+    </tr>
+  `).join('');
+
+  // 페이지네이션
+  const pg = document.getElementById('users-pagination');
+  pg.innerHTML = '';
+  for (let i = 1; i <= d.pages; i++) {
+    const btn = document.createElement('button');
+    btn.textContent = i;
+    if (i === page) btn.classList.add('active');
+    btn.onclick = () => loadUsers(i);
+    pg.appendChild(btn);
+  }
+}
+
+// ── 밴 목록 ──────────────────────────────
+async function loadBanned() {
+  const d = await fetch('/web/users?banned=true&limit=100').then(r => r.json());
+  const tbody = document.getElementById('banned-tbody');
+  if (!d.rows.length) {
+    tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--muted);padding:30px">밴된 유저가 없습니다.</td></tr>';
+    return;
+  }
+  tbody.innerHTML = d.rows.map(u => `
+    <tr>
+      <td><strong>${esc(u.nickname)}</strong></td>
+      <td style="color:var(--danger)">${esc(u.ban_reason || '-')}</td>
+      <td style="color:var(--muted)">${esc(u.ban_by || '-')}</td>
+      <td style="font-family:var(--mono);font-size:12px;color:var(--muted)">${u.ban_date?.slice(0,16) || '-'}</td>
+      <td>
+        <div class="btn-row">
+          <button class="btn btn-success" onclick="quickUnban('${esc(u.nickname)}')">언밴</button>
+          <button class="btn btn-accent" onclick="openUserDetail('${esc(u.nickname)}')">상세</button>
+        </div>
+      </td>
+    </tr>
+  `).join('');
+}
+
+// ── 채팅 로그 ──────────────────────────────
+async function loadLogs() {
+  const d = await fetch('/web/msgs').then(r => r.json());
+  const el = document.getElementById('msg-log-list');
+  if (!d.length) { el.innerHTML = '<p style="color:var(--muted);padding:20px">로그 없음</p>'; return; }
+  el.innerHTML = d.map(m => `
+    <div class="msg-row">
+      <span class="msg-time">${m.date?.slice(5,16) || ''}</span>
+      <span class="msg-sender" onclick="openUserDetail('${esc(m.nickname)}')" style="cursor:pointer">${esc(m.nickname)}</span>
+      <span class="msg-content">${esc(m.msg)}</span>
+    </div>
+  `).join('');
+}
+
+// ── 유저 상세 모달 ──────────────────────────────
+async function openUserDetail(nickname) {
+  currentUser = nickname;
+  const d = await fetch('/web/user/' + encodeURIComponent(nickname)).then(r => r.json());
+  document.getElementById('modal-user-title').textContent = '👤 ' + nickname;
+
+  const u = d.user;
+  document.getElementById('modal-user-detail').innerHTML = `
+    <div class="detail-item"><div class="key">상태</div><div class="val">${u.is_banned ? '<span class="badge banned">🔴 밴됨</span>' : '<span class="badge ok">🟢 정상</span>'}</div></div>
+    <div class="detail-item"><div class="key">첫 방문</div><div class="val" style="font-family:var(--mono);font-size:13px">${u.first_seen || '-'}</div></div>
+    <div class="detail-item"><div class="key">마지막 활동</div><div class="val" style="font-family:var(--mono);font-size:13px">${u.last_seen || '-'}</div></div>
+    <div class="detail-item"><div class="key">채팅방</div><div class="val">${u.room || '-'}</div></div>
+    <div class="detail-item"><div class="key">메시지 수</div><div class="val" style="font-family:var(--mono)">${u.msg_count}</div></div>
+    <div class="detail-item"><div class="key">경고 횟수</div><div class="val" style="font-family:var(--mono);color:var(--warn)">${u.warn_count}회</div></div>
+    ${u.is_banned ? `<div class="detail-item" style="grid-column:1/-1"><div class="key">밴 사유</div><div class="val" style="color:var(--danger)">${esc(u.ban_reason || '-')}</div></div>` : ''}
+  `;
+
+  document.getElementById('modal-note').value = u.notes || '';
+
+  document.getElementById('modal-user-actions').innerHTML = u.is_banned
+    ? `<button class="btn btn-success" onclick="quickUnban('${esc(nickname)}')">✅ 언밴</button>`
+    : `<button class="btn btn-danger" onclick="closeModal('modal-user');openBanModal('${esc(nickname)}')">🔨 밴 처리</button>
+       <button class="btn btn-warn" onclick="closeModal('modal-user');openWarnModal('${esc(nickname)}')">⚠️ 경고</button>`;
+
+  document.getElementById('modal-warns').innerHTML = d.warns.length
+    ? d.warns.map(w => `<li><span class="log-date">${w.date?.slice(0,16)}</span><span style="color:var(--warn)">${esc(w.reason)}</span><span style="color:var(--muted);margin-left:8px">by ${esc(w.by)}</span></li>`).join('')
+    : '<li style="color:var(--muted)">경고 기록 없음</li>';
+
+  document.getElementById('modal-bans').innerHTML = d.bans.length
+    ? d.bans.map(b => `<li><span class="log-date">${b.date?.slice(0,16)}</span><span class="badge ${b.action==='ban'?'banned':'ok'}" style="font-size:10px">${b.action}</span><span style="margin-left:8px">${esc(b.reason)}</span></li>`).join('')
+    : '<li style="color:var(--muted)">밴 기록 없음</li>';
+
+  document.getElementById('modal-msgs').innerHTML = d.msgs.length
+    ? d.msgs.map(m => `<div class="msg-row" style="grid-template-columns:130px 1fr"><span class="msg-time">${m.date?.slice(5,16)}</span><span class="msg-content">${esc(m.msg)}</span></div>`).join('')
+    : '<p style="color:var(--muted)">메시지 기록 없음</p>';
+
+  openModal('modal-user');
+}
+
+async function saveNote() {
+  await fetch('/web/note', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ nickname: currentUser, note: document.getElementById('modal-note').value }) });
+  alert('저장됨');
+}
+
+// ── 밴 / 언밴 / 경고 ──────────────────────────────
+function openBanModal(nickname) {
+  document.getElementById('ban-target').value = nickname;
+  document.getElementById('ban-nickname').value = nickname;
+  document.getElementById('ban-reason').value = '';
+  openModal('modal-ban');
+}
+
+function openWarnModal(nickname) {
+  document.getElementById('warn-target').value = nickname;
+  document.getElementById('warn-nickname').value = nickname;
+  document.getElementById('warn-reason').value = '';
+  openModal('modal-warn');
+}
+
+async function quickUnban(nickname) {
+  if (!confirm(`${nickname}님 밴을 해제하시겠습니까?`)) return;
+  await fetch('/web/unban', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ nickname }) });
+  closeModal('modal-user');
+  refresh();
+}
+
+async function doAction(type) {
+  if (type === 'ban') {
+    const nickname = document.getElementById('ban-target').value;
+    const reason = document.getElementById('ban-reason').value || '사유 없음';
+    await fetch('/web/ban', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ nickname, reason }) });
+    closeModal('modal-ban');
+  } else {
+    const nickname = document.getElementById('warn-target').value;
+    const reason = document.getElementById('warn-reason').value || '사유 없음';
+    const d = await fetch('/web/warn', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ nickname, reason }) }).then(r => r.json());
+    closeModal('modal-warn');
+    if (d.count >= 3) alert(`⚠️ 경고 ${d.count}회 누적으로 자동 밴 처리되었습니다.`);
+  }
+  refresh();
+}
+
+// ── 유틸 ──────────────────────────────
+function openModal(id) { document.getElementById(id).classList.add('open'); }
+function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+function esc(str) { return String(str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function refresh() {
+  loadStats();
+  const active = document.querySelector('.page.active')?.id?.replace('page-','');
+  if (active === 'users') loadUsers(currentPage);
+  if (active === 'banned') loadBanned();
+}
+
+document.querySelectorAll('.modal-overlay').forEach(m => {
+  m.addEventListener('click', e => { if (e.target === m) m.classList.remove('open'); });
+});
+
+loadStats();
+</script>
+</body>
+</html>
